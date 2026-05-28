@@ -1,0 +1,92 @@
+
+{
+  "entities": {
+    "Tunnel": {
+      "title": "Tunnel",
+      "description": "Configuration for an active TCP/HTTP tunnel.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["HTTP", "TCP"] },
+        "localPort": { "type": "number" },
+        "publicUrl": { "type": "string" },
+        "publicPort": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "standby", "error"] },
+        "userId": { "type": "string" },
+        "subdomain": { "type": "string" },
+        "latency": { "type": "string" },
+        "bandwidth": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "type", "localPort", "userId"]
+    },
+    "ReservedDomain": {
+      "title": "Reserved Domain",
+      "description": "A static subdomain or TCP gateway port reserved by the user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "url": { "type": "string" },
+        "port": { "type": "number" },
+        "gatewayPort": { "type": "number" },
+        "type": { "type": "string", "enum": ["HTTP", "TCP"] },
+        "status": { "type": "string", "enum": ["assigned", "pending"] },
+        "description": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["url", "type", "userId"]
+    },
+    "SecurityRule": {
+      "title": "Security Rule",
+      "description": "An IP whitelist rule for access control.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "cidr": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["label", "cidr", "userId"]
+    },
+    "TrafficLog": {
+      "title": "Traffic Log",
+      "description": "A single HTTP/TCP connection log entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "method": { "type": "string" },
+        "path": { "type": "string" },
+        "status": { "type": "number" },
+        "latency": { "type": "number" },
+        "size": { "type": "number" },
+        "userId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["method", "path", "status", "userId", "timestamp"]
+    }
+  },
+  "auth": {
+    "providers": ["google.com"]
+  },
+  "firestore": {
+    "/tunnels/{tunnelId}": {
+      "schema": "#/backend/entities/Tunnel",
+      "description": "Active tunnel configurations."
+    },
+    "/domains/{domainId}": {
+      "schema": "#/backend/entities/ReservedDomain",
+      "description": "User-reserved subdomains and ports."
+    },
+    "/security_rules/{ruleId}": {
+      "schema": "#/backend/entities/SecurityRule",
+      "description": "IP whitelist and access control rules."
+    },
+    "/traffic_logs/{logId}": {
+      "schema": "#/backend/entities/TrafficLog",
+      "description": "Live network traffic entries."
+    }
+  }
+}

@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Production-ready rules: require authentication and enforce ownership
+    // These rules assume the client signs in (including anonymous auth)
+    // and that documents which should be user-scoped include an `ownerId` field.
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /tunnels/{tunnelId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /domains/{domainId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /traffic_logs/{logId} {
+      // Allow authenticated reads; writes should be restricted to server-only processes
+      allow read: if isAuthenticated();
+      allow create: if false;
+      allow update, delete: if false;
+    }
+
+    match /security_rules/{ruleId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if false;
+    }
+
+    // Default: authenticated reads allowed, writes denied by default.
+    match /{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+  }
+}

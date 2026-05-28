@@ -1,0 +1,16 @@
+{
+  "placeholderImages": [
+    {
+      "id": "hero-network",
+      "description": "Abstract blue network nodes connecting globally",
+      "imageUrl": "https://picsum.photos/seed/bridgeflux_net/1200/800",
+      "imageHint": "network infrastructure"
+    },
+    {
+      "id": "security-shield",
+      "description": "Holographic security shield over circuit lines",
+      "imageUrl": "https://picsum.photos/seed/bridgeflux_sec/800/600",
+      "imageHint": "cybersecurity shield"
+    }
+  ]
+}
