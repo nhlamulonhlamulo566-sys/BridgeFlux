@@ -2,6 +2,7 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  outputFileTracingRoot: __dirname,
   // By default, fail builds on TypeScript/ESLint errors. Set env vars to override in exceptional cases.
   typescript: {
     ignoreBuildErrors: process.env.NEXT_DISABLE_BUILD_CHECKS === 'true',
