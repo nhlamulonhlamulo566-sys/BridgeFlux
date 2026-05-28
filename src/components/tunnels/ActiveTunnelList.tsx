@@ -86,7 +86,7 @@ export function ActiveTunnelList() {
   }, []);
 
   const tunnelsQuery = useMemoFirebase(() => {
-    if (!db || !token || !authReady || !authUser) return null;
+    if (!db || !token || !authReady) return null;
     return query(
       collection(db, "tunnels"),
       where("userId", "==", token)

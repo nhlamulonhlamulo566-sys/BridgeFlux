@@ -22,12 +22,12 @@ export default function TunnelsPage() {
   }, []);
 
   const tunnelsQuery = useMemoFirebase(() => {
-    if (!db || !token || !authReady || !authUser) return null;
+    if (!db || !token || !authReady) return null;
     return query(collection(db, "tunnels"), where("userId", "==", token));
   }, db, token, authReady, authUser);
 
   const trafficQuery = useMemoFirebase(() => {
-    if (!db || !token || !authReady || !authUser) return null;
+    if (!db || !token || !authReady) return null;
     return query(
       collection(db, "traffic_logs"),
       where("userId", "==", token)

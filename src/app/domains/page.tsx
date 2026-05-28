@@ -43,7 +43,7 @@ export default function DomainsPage() {
   }, []);
 
   const domainsQuery = useMemoFirebase(() => {
-    if (!db || !token || !authReady || !authUser) return null;
+    if (!db || !token || !authReady) return null;
     return query(
       collection(db, "domains"),
       where("userId", "==", token)

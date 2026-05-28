@@ -20,7 +20,7 @@ export function TrafficStream({ isPaused = false }: TrafficStreamProps) {
   const [displayLogs, setDisplayLogs] = useState<any[]>([]);
 
   const trafficQuery = useMemoFirebase(() => {
-    if (!db || !token || !authReady || !authUser) return null;
+    if (!db || !token || !authReady) return null;
     return query(
       collection(db, "traffic_logs"),
       where("userId", "==", token),

@@ -30,7 +30,7 @@ export default function SecurityPage() {
   }, []);
 
   const rulesQuery = useMemoFirebase(() => {
-    if (!db || !token || !authReady || !authUser) return null;
+    if (!db || !token || !authReady) return null;
     return query(
       collection(db, "security_rules"),
       where("userId", "==", token)

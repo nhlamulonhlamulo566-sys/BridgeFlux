@@ -22,7 +22,7 @@ export default function InspectorPage() {
   const [isClearing, setIsClearing] = useState(false);
 
   const handleClearLogs = async () => {
-    if (!db || !token || !authReady || !authUser) return;
+    if (!db || !token || !authReady) return;
     setIsClearing(true);
     try {
       const q = query(collection(db, "traffic_logs"), where("userId", "==", token));

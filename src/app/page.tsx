@@ -28,17 +28,17 @@ export default function Home() {
   }, []);
 
   const tunnelsQuery = useMemoFirebase(() => {
-    if (!db || !mounted || !token || !authReady || !authUser) return null;
+    if (!db || !mounted || !token || !authReady) return null;
     return query(collection(db, "tunnels"), where("userId", "==", token));
   }, db, mounted, token, authReady, authUser);
 
   const domainsQuery = useMemoFirebase(() => {
-    if (!db || !mounted || !token || !authReady || !authUser) return null;
+    if (!db || !mounted || !token || !authReady) return null;
     return query(collection(db, "domains"), where("userId", "==", token));
   }, db, mounted, token, authReady, authUser);
 
   const trafficQuery = useMemoFirebase(() => {
-    if (!db || !mounted || !token || !authReady || !authUser) return null;
+    if (!db || !mounted || !token || !authReady) return null;
     return query(
       collection(db, "traffic_logs"),
       where("userId", "==", token),

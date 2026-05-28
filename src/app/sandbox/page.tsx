@@ -33,7 +33,7 @@ export default function SandboxPage() {
   };
 
   const recordTrafficLog = (method: string, path: string, status: number, size: number) => {
-    if (!db || !token || !authReady || !authUser) return;
+    if (!db || !token || !authReady) return;
     const logData = {
       method,
       path,
@@ -55,7 +55,7 @@ export default function SandboxPage() {
   };
 
   const seedInitialData = async () => {
-    if (!db || !token || !authReady || !authUser) return;
+    if (!db || !token || !authReady) return;
     setIsSeeding(true);
     addLogToConsole("Starting live database migration...");
 
