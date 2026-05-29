@@ -42,13 +42,13 @@ export function TerminalGenerator() {
       return `powershell.exe -Command "Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','bridgeflux service install --port ${port} --token ${baseToken} --startup automatic' -Verb RunAs"`;
     }
 
-    const base = `bridgeflux connect --port ${port} --token ${baseToken}`;
+    const base = `bridgeflux connect --port ${port} --token ${baseToken} --tunnel-id <tunnel-id> --base ${origin}`;
     if (!isDaemon) return base;
     
     if (os === 'bash') {
       return `nohup ${base} --daemon > bridgeflux.log 2>&1 &`;
     }
-    return `powershell.exe -Command "Start-Process -FilePath 'bridgeflux' -ArgumentList 'connect','--port','${port}','--token','${baseToken}','--daemon' -WindowStyle Hidden -Verb RunAs"`;
+    return `powershell.exe -Command "Start-Process -FilePath 'bridgeflux' -ArgumentList 'connect','--port','${port}','--token','${baseToken}','--tunnel-id','<tunnel-id>','--base','${origin}','--daemon' -WindowStyle Hidden -Verb RunAs"`;
   };
 
   const copy = (text: string) => {
@@ -134,7 +134,7 @@ export function TerminalGenerator() {
                   <div className="absolute top-0 right-0 w-1 h-full bg-primary/20"></div>
                   <pre className="text-[11px] font-mono text-foreground/90 overflow-x-auto scroll-hide pr-12">
                     <code>
-                      <span className="text-muted-foreground mr-3 opacity-30 select-none">{os === 'bash' ? 'λ' : 'PS'}</span>
+                      <span className="text-muted-foreground mr-3 opacity-30 select-none">{os === 'bash' ? 'λ ' : 'PS '}</span>
                       {getInstallCommand(os as any)}
                     </code>
                   </pre>
@@ -163,7 +163,7 @@ export function TerminalGenerator() {
                     os === 'bash' ? 'text-primary/90' : 'text-accent/90'
                   )}>
                     <code>
-                      <span className="text-muted-foreground mr-3 opacity-30 select-none">{os === 'bash' ? 'λ' : 'PS'}</span>
+                      <span className="text-muted-foreground mr-3 opacity-30 select-none">{os === 'bash' ? 'λ ' : 'PS '}</span>
                       {getConnectCommand(os as any)}
                     </code>
                   </pre>

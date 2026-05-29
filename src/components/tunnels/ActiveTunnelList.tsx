@@ -174,13 +174,6 @@ export function ActiveTunnelList() {
     try {
       navigator.clipboard.writeText(text);
       setCopiedId(id);
-      toast({ title: "Command Copied", description: "Paste into your terminal and execute." });
-      
-      // After 2 seconds, reset the copied state
-      setTimeout(() => {
-        setCopiedId(null);
-        setIsCopying(false);
-      }, 2000);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to copy command";
       setCommandError(errorMsg);
@@ -190,11 +183,14 @@ export function ActiveTunnelList() {
         title: "Copy Failed",
         description: errorMsg,
       });
+      return;
     }
-  };
 
-  // Informational helper: note that System32 may require elevation and a fallback will be used.
-  const powerShellFallbackNotice = "Installer will try System32; if denied it falls back to %LOCALAPPDATA%\\Microsoft\\WindowsApps. Reopen PowerShell if command is not available.";
+    setTimeout(() => {
+      setCopiedId(null);
+      setIsCopying(false);
+    }, 2000);
+  };
 
   const handleDeleteTunnel = (id: string) => {
     if (!db) return;
@@ -215,8 +211,8 @@ export function ActiveTunnelList() {
       : `powershell.exe -Command "Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','iwr -useb ${base}/install.ps1 | iex' -Verb RunAs"`;
     
     const connect = os === 'bash'
-      ? `bridgeflux connect --port ${tunnel.localPort} --token ${token}`
-      : `powershell.exe -Command "Start-Process -FilePath 'bridgeflux' -ArgumentList 'connect','--port','${tunnel.localPort}','--token','${token}' -Verb RunAs"`;
+      ? `bridgeflux connect --port ${tunnel.localPort} --token ${token} --tunnel-id ${tunnel.id} --base ${window.location.origin}`
+      : `powershell.exe -Command "Start-Process -FilePath 'bridgeflux' -ArgumentList 'connect','--port','${tunnel.localPort}','--token','${token}','--tunnel-id','${tunnel.id}','--base','${window.location.origin}' -Verb RunAs"`;
     
     return { install, connect };
   };
@@ -329,6 +325,11 @@ export function ActiveTunnelList() {
                       </span>
                     </div>
                   </div>
+                  {tunnel.latency === '---' && (
+                    <p className="text-xs text-muted-foreground/70 mt-2 max-w-2xl">
+                      Waiting for a local agent connection. Open Setup Agent and run the copied command on your machine to activate this bridge.
+                    </p>
+                  )}
                 </div>
               </div>
 
