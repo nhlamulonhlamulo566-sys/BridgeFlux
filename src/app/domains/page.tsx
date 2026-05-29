@@ -109,14 +109,14 @@ export default function DomainsPage() {
     }, 1500);
   };
 
-  if (!mounted) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="animate-spin" /></div>;
+  if (!mounted) return <div className="flex min-h-screen items-center justify-center bg-background"><Loader2 className="animate-spin" /></div>;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex min-h-screen bg-background overflow-hidden">
       <Sidebar />
       
       <main className="flex-1 overflow-y-auto p-8 relative">
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[120px] -z-10"></div>
+        <div className="absolute top-0 right-0 w-[min(40vw,400px)] h-[min(40vw,400px)] bg-primary/5 rounded-full blur-[120px] -z-10"></div>
         
         <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>

@@ -46,10 +46,10 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex min-h-screen bg-background overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-8 relative">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] -z-10"></div>
+        <div className="absolute top-0 right-0 w-[min(40vw,500px)] h-[min(40vw,500px)] bg-primary/5 rounded-full blur-[120px] -z-10"></div>
         
         <header className="mb-12">
           <h1 className="text-4xl font-headline font-bold mb-2 text-foreground tracking-tight">System Settings</h1>

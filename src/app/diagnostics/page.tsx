@@ -8,7 +8,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 export default function DiagnosticsPage() {
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex min-h-screen bg-background overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-8">
         <header className="mb-8">

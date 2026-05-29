@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const [mounted, setMounted] = useState(false);
-  const [fb, setFb] = useState<{ firebaseApp: any; firestore: any; auth: any } | null>(null);
+  const [fb, setFb] = useState<{ firebaseApp: any | null; firestore: any | null; auth: any | null } | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,8 +45,7 @@ export default function RootLayout({
       const init = initializeFirebase();
       setFb(init);
     } catch (e) {
-      // initialization may fail if env is misconfigured; leave fb null and let UI handle it
-      // console.warn('Firebase init failed', e);
+      setFb({ firebaseApp: null, firestore: null, auth: null });
     }
   }, []);
 
@@ -67,7 +66,7 @@ export default function RootLayout({
             <TokenContext.Provider value={{ token: sessionToken, updateToken }}>
               <div className="relative flex min-h-screen flex-col">
                 {mounted && sessionToken ? children : (
-                <div className="flex h-screen items-center justify-center bg-background">
+                <div className="flex min-h-screen items-center justify-center bg-background">
                   <div className="flex flex-col items-center space-y-4">
                     <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
                     <p className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Generating Mesh Identity...</p>
@@ -79,7 +78,7 @@ export default function RootLayout({
             <Toaster />
           </FirebaseClientProvider>
         ) : (
-          <div className="flex h-screen items-center justify-center bg-background">
+          <div className="flex min-h-screen items-center justify-center bg-background">
             <div className="flex flex-col items-center space-y-4">
               <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
               <p className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Initializing...</p>

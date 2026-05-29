@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 interface FirebaseContextProps {
@@ -24,9 +24,9 @@ const FirebaseContext = createContext<FirebaseContextProps>({
 });
 
 export const FirebaseProvider: React.FC<{
-  firebaseApp: FirebaseApp;
-  firestore: Firestore;
-  auth: Auth;
+  firebaseApp: FirebaseApp | null;
+  firestore: Firestore | null;
+  auth: Auth | null;
   children: React.ReactNode;
 }> = ({ firebaseApp, firestore, auth, children }) => {
   const [authUser, setAuthUser] = useState<User | null>(null);
@@ -38,18 +38,11 @@ export const FirebaseProvider: React.FC<{
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
-      if (user) {
-        setAuthReady(true);
-        return;
-      }
-
-      try {
-        await signInAnonymously(auth);
-      } catch {
-        setAuthReady(true);
-      }
+      // Mark auth as ready even if no user is present. The app will
+      // continue to function without attempting anonymous sign-in.
+      setAuthReady(true);
     });
 
     return () => unsubscribe();

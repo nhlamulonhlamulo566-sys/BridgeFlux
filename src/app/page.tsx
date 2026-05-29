@@ -81,14 +81,14 @@ export default function Home() {
     }));
   }, [traffic, mounted]);
 
-  if (!mounted) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="animate-spin text-primary w-10 h-10" /></div>;
+  if (!mounted) return <div className="flex min-h-screen items-center justify-center bg-background"><Loader2 className="animate-spin text-primary w-10 h-10" /></div>;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden font-body">
+    <div className="flex min-h-screen bg-background overflow-hidden font-body">
       <Sidebar />
       
       <main className="flex-1 overflow-y-auto p-8 relative">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
+        <div className="absolute top-0 right-0 w-[min(40vw,600px)] h-[min(40vw,600px)] bg-primary/10 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
         
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-10 space-y-4 md:space-y-0">
           <div>

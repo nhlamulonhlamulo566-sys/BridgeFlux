@@ -8,9 +8,9 @@ import { Auth } from 'firebase/auth';
 import { FirebaseProvider } from './provider';
 
 export const FirebaseClientProvider: React.FC<{
-  firebaseApp: FirebaseApp;
-  firestore: Firestore;
-  auth: Auth;
+  firebaseApp: FirebaseApp | null;
+  firestore: Firestore | null;
+  auth: Auth | null;
   children: React.ReactNode;
 }> = ({ firebaseApp, firestore, auth, children }) => {
   return (

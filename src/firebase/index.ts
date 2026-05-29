@@ -3,7 +3,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
 export function initializeFirebase() {
@@ -16,34 +16,12 @@ export function initializeFirebase() {
 
 export async function ensureAnonymousAuth() {
   const { auth } = initializeFirebase();
-
   return new Promise((resolve) => {
     const unsubscribe = onAuthStateChanged(
       auth,
-      async (user) => {
-        if (user) {
-          unsubscribe();
-          resolve(user);
-          return;
-        }
-
-        try {
-          const credential = await signInAnonymously(auth);
-          unsubscribe();
-          resolve(credential.user);
-        } catch (error: any) {
-          unsubscribe();
-          // If anonymous auth is not enabled or the Firebase Auth configuration is missing,
-          // continue with app rendering instead of blocking the UI.
-          if (
-            error?.code === 'auth/configuration-not-found' ||
-            error?.code === 'auth/operation-not-allowed'
-          ) {
-            resolve(null);
-          } else {
-            resolve(null);
-          }
-        }
+      (user) => {
+        unsubscribe();
+        resolve(user || null);
       },
       () => {
         unsubscribe();

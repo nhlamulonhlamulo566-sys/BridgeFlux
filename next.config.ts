@@ -32,6 +32,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Silence client-side bundling warnings for OpenTelemetry dynamic requires
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Use IgnorePlugin to prevent bundling server-only OpenTelemetry internals into client
+      const webpack = require('webpack');
+      config.plugins.push(new webpack.IgnorePlugin({ resourceRegExp: /@opentelemetry\// }));
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
