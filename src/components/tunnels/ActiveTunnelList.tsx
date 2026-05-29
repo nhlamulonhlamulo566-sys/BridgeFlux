@@ -74,6 +74,8 @@ export function ActiveTunnelList() {
   const [isVerifying, setIsVerifying] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isCopying, setIsCopying] = useState(false);
+  const [commandError, setCommandError] = useState<string | null>(null);
   const [initTunnel, setInitTunnel] = useState<any>(null);
   
   const [name, setName] = useState("");
@@ -160,10 +162,35 @@ export function ActiveTunnelList() {
   };
 
   const copyCommand = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-    toast({ title: "Command Copied", description: "Paste into PowerShell and allow the UAC prompt." });
+    // Prevent copying if another copy is in progress
+    if (isCopying) {
+      setCommandError("Already copying. Please wait for the current copy to complete.");
+      return;
+    }
+
+    setIsCopying(true);
+    setCommandError(null);
+
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      toast({ title: "Command Copied", description: "Paste into your terminal and execute." });
+      
+      // After 2 seconds, reset the copied state
+      setTimeout(() => {
+        setCopiedId(null);
+        setIsCopying(false);
+      }, 2000);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to copy command";
+      setCommandError(errorMsg);
+      setIsCopying(false);
+      toast({
+        variant: "destructive",
+        title: "Copy Failed",
+        description: errorMsg,
+      });
+    }
   };
 
   // Informational helper: note that System32 may require elevation and a fallback will be used.
@@ -324,7 +351,14 @@ export function ActiveTunnelList() {
 
                 <div className="flex items-center space-x-3">
                   {tunnel.latency === '---' ? (
-                    <Dialog open={!!initTunnel && initTunnel.id === tunnel.id} onOpenChange={(open) => setInitTunnel(open ? tunnel : null)}>
+                    <Dialog open={!!initTunnel && initTunnel.id === tunnel.id} onOpenChange={(open) => {
+                      setInitTunnel(open ? tunnel : null);
+                      if (!open) {
+                        setCommandError(null);
+                        setCopiedId(null);
+                        setIsCopying(false);
+                      }
+                    }}>
                       <DialogTrigger asChild>
                         <Button 
                           variant="outline" 
@@ -350,37 +384,65 @@ export function ActiveTunnelList() {
                           </div>
                         </DialogHeader>
                         <div className="py-6 border-y border-white/5 my-4">
-                          <Tabs defaultValue="ps">
+                          <Tabs defaultValue="ps" onValueChange={() => setCommandError(null)}>
                             <TabsList className="grid w-full grid-cols-2 bg-secondary/50 mb-8 rounded-2xl h-12 p-1">
                               <TabsTrigger value="ps" className="text-[10px] font-bold uppercase data-[state=active]:bg-accent data-[state=active]:text-white transition-all rounded-xl">Windows (Elevated)</TabsTrigger>
                               <TabsTrigger value="bash" className="text-[10px] font-bold uppercase data-[state=active]:bg-primary data-[state=active]:text-white transition-all rounded-xl">Unix / MacOS</TabsTrigger>
                             </TabsList>
+                            {commandError && (
+                              <div className="mb-6 p-4 rounded-2xl bg-destructive/10 border border-destructive/30 flex items-start space-x-3">
+                                <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center shrink-0 mt-0.5">
+                                  <span className="text-destructive text-xs font-bold">!</span>
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-xs font-bold text-destructive">Error</p>
+                                  <p className="text-xs text-destructive/80 mt-1">{commandError}</p>
+                                </div>
+                              </div>
+                            )}
                             {['ps', 'bash'].map((os: any) => {
                               const cmds = getCommands(tunnel, os);
                               return (
                                 <TabsContent key={os} value={os} className="space-y-8 animate-in fade-in zoom-in-95">
                                   <div className="space-y-3">
                                     <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">01. Bootstrap Mesh Agent</Label>
-                                    <div className="bg-black/40 border border-white/5 p-5 rounded-2xl flex items-center justify-between group hover:border-primary/20 transition-all relative overflow-hidden">
+                                    <div className="bg-black/40 border border-white/5 rounded-2xl group hover:border-primary/20 transition-all relative overflow-hidden">
                                       <div className="absolute top-0 right-0 w-1 h-full bg-primary/20"></div>
-                                      <code className="text-[12px] font-mono text-foreground/90 truncate pr-6">{cmds.install}</code>
-                                      <Button variant="ghost" size="icon" onClick={() => copyCommand(cmds.install, 'inst')} className="h-10 w-10 hover:bg-white/10 shrink-0 rounded-xl bg-black/40 border border-white/10">
-                                        {copiedId === 'inst' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                                      </Button>
+                                      <div className="flex items-stretch">
+                                        <code className="flex-1 text-[11px] font-mono text-foreground/90 p-5 overflow-x-auto scroll-hide break-all whitespace-pre-wrap">{cmds.install}</code>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          onClick={() => copyCommand(cmds.install, 'inst')}
+                                          disabled={isCopying}
+                                          className="h-auto w-14 hover:bg-white/10 shrink-0 rounded-none bg-black/40 border-l border-white/10"
+                                        >
+                                          {copiedId === 'inst' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
                                   <div className="space-y-3">
                                     <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">02. Establish Cloud Bridge</Label>
-                                    <div className="bg-black/40 border border-white/5 p-5 rounded-2xl flex items-center justify-between group hover:border-accent/20 transition-all relative overflow-hidden">
+                                    <div className="bg-black/40 border border-white/5 rounded-2xl group hover:border-accent/20 transition-all relative overflow-hidden">
                                       <div className="absolute top-0 right-0 w-1 h-full bg-accent/20"></div>
-                                      <code className="text-[12px] font-mono text-accent truncate pr-6">{cmds.connect}</code>
-                                      <Button variant="ghost" size="icon" onClick={() => copyCommand(cmds.connect, 'conn')} className="h-10 w-10 hover:bg-white/10 shrink-0 rounded-xl bg-black/40 border border-white/10">
-                                        {copiedId === 'conn' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                                      </Button>
+                                      <div className="flex items-stretch">
+                                        <code className="flex-1 text-[11px] font-mono text-accent p-5 overflow-x-auto scroll-hide break-all whitespace-pre-wrap">{cmds.connect}</code>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon"
+                                          onClick={() => copyCommand(cmds.connect, 'conn')}
+                                          disabled={isCopying}
+                                          className="h-auto w-14 hover:bg-white/10 shrink-0 rounded-none bg-black/40 border-l border-white/10"
+                                        >
+                                          {copiedId === 'conn' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
                                   {os === 'ps' && (
-                                    <div className="rounded-2xl bg-secondary/10 border border-white/10 p-4 text-[10px] text-muted-foreground space-y-1">
+                                    <div className="rounded-2xl bg-secondary/10 border border-white/10 p-4 text-[10px] text-muted-foreground space-y-2">
+                                      <div className="font-bold text-foreground mb-2">Important Notes</div>
                                       <div>Copy the PowerShell command, paste it into a PowerShell window, and confirm the Windows UAC prompt to elevate.</div>
                                       <div className="text-[10px] text-muted-foreground/80">The installer will try to write a CLI shim to <strong>System32</strong>. If that fails it will fall back to <strong>%LOCALAPPDATA%\Microsoft\WindowsApps</strong>.</div>
                                       <div className="text-[10px] text-muted-foreground/80">Example (non-elevated): <code className="bg-black/10 px-1 rounded">C:\Users\&lt;your-user&gt;\AppData\Local\Microsoft\WindowsApps\bridgeflux.cmd</code>. To locate it run <code className="bg-black/10 px-1 rounded">echo $env:LOCALAPPDATA</code> and append <code className="bg-black/10 px-1 rounded">\Microsoft\WindowsApps\bridgeflux.cmd</code>.</div>
