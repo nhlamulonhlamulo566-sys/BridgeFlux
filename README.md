@@ -27,6 +27,8 @@ Enterprise-grade TCP/HTTP tunneling and edge diagnostics platform.
    1. Create a Firebase project and a Web app in the Firebase console.
    2. Copy the web app config values into a local `.env.local` file (see `.env.local.example`).
       - Do NOT commit `.env.local` to source control.
+      - If your local app requires Firebase admin access, also set `FIREBASE_SERVICE_ACCOUNT_KEY` or `GOOGLE_APPLICATION_CREDENTIALS` in `.env.local`.
+      - Example local file path: `GOOGLE_APPLICATION_CREDENTIALS=./studio-7583316153-57312-firebase-adminsdk-fbsvc-e6ce47ddd3.json`
    3. (Optional) To test without a hosted Firebase project, run the Firestore emulator and set `USE_FIREBASE_EMULATOR=true` in `.env.local`.
    4. Start the dev server:
 

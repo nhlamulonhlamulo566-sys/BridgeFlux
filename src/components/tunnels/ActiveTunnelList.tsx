@@ -208,11 +208,11 @@ export function ActiveTunnelList() {
     const base = window.location.origin || "http://localhost:9002";
     const install = os === 'bash' 
       ? `curl -sL ${base}/install.sh | sudo bash -s -- ${base}` 
-      : `powershell.exe -Command "Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','iwr -useb ${base}/install.ps1 | iex' -Verb RunAs"`;
+      : `powershell.exe -Command "Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-Command','iwr -useb ${base}/install.ps1 | iex' -Verb RunAs"`;
     
     const connect = os === 'bash'
       ? `bridgeflux connect --port ${tunnel.localPort} --token ${token} --tunnel-id ${tunnel.id} --base ${window.location.origin}`
-      : `powershell.exe -Command "Start-Process -FilePath 'bridgeflux' -ArgumentList 'connect','--port','${tunnel.localPort}','--token','${token}','--tunnel-id','${tunnel.id}','--base','${window.location.origin}' -Verb RunAs"`;
+      : `powershell.exe -Command "Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-Command','bridgeflux connect --port ${tunnel.localPort} --token ${token} --tunnel-id ${tunnel.id} --base ${window.location.origin}' -Verb RunAs"`;
     
     return { install, connect };
   };

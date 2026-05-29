@@ -75,7 +75,11 @@ async function main() {
 
     if (base) {
       const success = await notifyAgentConnect({ base, tunnelId, token, port, latency });
-      if (success) process.exit(0);
+      if (!success) {
+        writeLog(`connect-failed port=${port} token=${token} tunnelId=${tunnelId} base=${base}`);
+        process.exit(1);
+      }
+      process.exit(0);
     }
 
     console.log(`✅ BridgeFlux CLI stub: connected to localhost:${port} using token ${token}`);

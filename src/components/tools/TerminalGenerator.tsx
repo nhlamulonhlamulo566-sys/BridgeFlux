@@ -29,7 +29,7 @@ export function TerminalGenerator() {
   const getInstallCommand = (os: 'bash' | 'ps') => {
     const base = origin || "http://localhost:9002";
     if (os === 'bash') return `curl -sL ${base}/install.sh | sudo bash -s -- ${base}`;
-    return `powershell.exe -Command "Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','iwr -useb ${base}/install.ps1 | iex' -Verb RunAs"`;
+    return `powershell.exe -Command "Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-Command','iwr -useb ${base}/install.ps1 | iex' -Verb RunAs"`;
   };
 
   const getConnectCommand = (os: 'bash' | 'ps') => {

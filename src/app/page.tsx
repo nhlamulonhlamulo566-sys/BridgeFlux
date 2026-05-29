@@ -67,9 +67,42 @@ export default function Home() {
   const totalReservedCount = domains?.length || 0;
 
   const throughputMB = useMemo(() => {
-    const totalBytes = traffic?.reduce((acc: number, log: any) => acc + (log.size || 0), 0) || 0;
-    return (totalBytes / (1024 * 1024)).toFixed(2);
+    if (!traffic || traffic.length === 0) return '0.00';
+    const totalBytes = traffic.reduce((acc: number, log: any) => acc + (log.size || 0), 0);
+    const timestamps = traffic
+      .map((log: any) => log.timestamp?.toDate?.())
+      .filter((value: any) => value instanceof Date);
+
+    if (timestamps.length < 2) {
+      return (totalBytes / (1024 * 1024)).toFixed(2);
+    }
+
+    const sortedTimestamps = timestamps.sort((a: Date, b: Date) => a.getTime() - b.getTime());
+    const durationHours = Math.max((sortedTimestamps[sortedTimestamps.length - 1].getTime() - sortedTimestamps[0].getTime()) / 3600000, 1 / 60);
+    return (totalBytes / (1024 * 1024) / durationHours).toFixed(2);
   }, [traffic]);
+
+  const wafLatency = useMemo(() => {
+    const trafficLatencies = traffic
+      ?.map((log: any) => Number(String(log.latency || '').replace(/[^0-9.]/g, '')))
+      .filter((latency: number) => !Number.isNaN(latency) && latency > 0) || [];
+
+    if (trafficLatencies.length > 0) {
+      const avgLatency = trafficLatencies.reduce((acc: number, value: number) => acc + value, 0) / trafficLatencies.length;
+      return `${Math.round(avgLatency)}ms`;
+    }
+
+    const tunnelLatencies = tunnels
+      ?.map((t: any) => Number(String(t.latency || '').replace(/[^0-9.]/g, '')))
+      .filter((latency: number) => !Number.isNaN(latency) && latency > 0) || [];
+
+    if (tunnelLatencies.length > 0) {
+      const avgLatency = tunnelLatencies.reduce((acc: number, value: number) => acc + value, 0) / tunnelLatencies.length;
+      return `${Math.round(avgLatency)}ms`;
+    }
+
+    return '---';
+  }, [traffic, tunnels]);
 
   const chartData = useMemo(() => {
     if (!mounted || !traffic || traffic.length === 0) {
@@ -121,7 +154,7 @@ export default function Home() {
           <StatCard label="Active Tunnels" value={activeTunnelsCount.toString()} subValue={`/ ${tunnels?.length || 0}`} icon={Zap} color="primary" />
           <StatCard label="Edge Domains" value={totalReservedCount.toString()} subValue="Reserved" icon={Globe} color="accent" />
           <StatCard label="Throughput" value={throughputMB} subValue="MB/hr" icon={Activity} trend="up" color="primary" />
-          <StatCard label="WAF Latency" value="12ms" subValue="Avg" icon={Database} color="accent" />
+          <StatCard label="WAF Latency" value={wafLatency} subValue="Avg" icon={Database} color="accent" />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">

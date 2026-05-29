@@ -70,6 +70,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, latency: activeLatency });
   } catch (error) {
     console.error('Agent connect failed:', error);
-    return NextResponse.json({ error: 'Failed to activate tunnel.' }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    const responseError = process.env.BRIDGEFLUX_DEBUG === 'true'
+      ? message
+      : 'Failed to activate tunnel.';
+    return NextResponse.json({ error: responseError }, { status: 500 });
   }
 }
