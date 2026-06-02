@@ -17,10 +17,32 @@ function writeLog(message) {
 }
 
 function help() {
-  console.log('BridgeFlux CLI stub');
-  console.log('Usage: bridgeflux connect --port <port> --token <token> --base <url> [--tunnel-id <id>]');
-  console.log('       bridgeflux service install --port <port> --token <token> --startup automatic');
-  console.log('       bridgeflux disconnect');
+  console.log('╔═══════════════════════════════════════════════════════════╗');
+  console.log('║          BridgeFlux CLI - Persistent Tunnel Proxy         ║');
+  console.log('╚═══════════════════════════════════════════════════════════╝');
+  console.log('');
+  console.log('USAGE:');
+  console.log('  bridgeflux connect --port <PORT> --token <TOKEN> --base <URL> [--tunnel-id <ID>] [--proxy-port <PORT>]');
+  console.log('  bridgeflux service install --port <PORT> --token <TOKEN> --startup automatic');
+  console.log('  bridgeflux disconnect');
+  console.log('  bridgeflux logs');
+  console.log('');
+  console.log('EXAMPLES:');
+  console.log('  # Activate a live tunnel and start proxying traffic');
+  console.log('  bridgeflux connect --port 3306 --token bf_user_123 \\');
+  console.log('    --tunnel-id abc123 --proxy-port 63756 --base https://bridge-flux.vercel.app');
+  console.log('');
+  console.log('  # Install as Windows service (auto-start on boot)');
+  console.log('  bridgeflux service install --port 3306 --token bf_user_123 \\');
+  console.log('    --startup automatic');
+  console.log('');
+  console.log('FEATURES:');
+  console.log('  • Real-time throughput measurement (Mbps)');
+  console.log('  • Persistent TCP proxy to localhost:<port>');
+  console.log('  • Automatic bandwidth reporting to dashboard');
+  console.log('  • Graceful shutdown with Ctrl+C');
+  console.log('  • All activity logged to ~/.bridgeflux/bridgeflux.log');
+  console.log('');
   process.exit(0);
 }
 
@@ -51,6 +73,14 @@ async function notifyAgentConnect({ base, tunnelId, token, port, latency }) {
 
     console.log(`✅ BridgeFlux CLI stub: connected to localhost:${port} using token ${token}`);
     console.log(`🔌 Tunnel activated with latency ${payload.latency || latency}.`);
+
+    if (payload.publicUrl) {
+      const publicPort = typeof payload.publicPort === 'string' ? parseInt(payload.publicPort, 10) : payload.publicPort;
+      const scheme = publicPort === 80 ? 'http://' : 'https://';
+      const endpoint = `${scheme}${payload.publicUrl}${publicPort && publicPort !== 443 ? `:${publicPort}` : ''}`;
+      console.log(`🔗 Public endpoint assigned: ${endpoint}`);
+    }
+
     writeLog(`connect port=${port} token=${token} tunnelId=${tunnelId} base=${base} latency=${payload.latency || latency} status=${response.status}`);
     return true;
   } catch (error) {
@@ -58,6 +88,216 @@ async function notifyAgentConnect({ base, tunnelId, token, port, latency }) {
     writeLog(`connect-error port=${port} token=${token} tunnelId=${tunnelId} base=${base} error=${error.message || error}`);
     return false;
   }
+}
+
+async function reportProxyState({ base, tunnelId, token, proxyPort, proxyHost, status }) {
+  if (!base || !tunnelId) return;
+
+  try {
+    const url = new URL('/api/agent/proxy', base).toString();
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token, tunnelId, proxyPort, proxyHost, status }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error(`BridgeFlux CLI: proxy report failed with status=${response.status}`);
+      writeLog(`proxy-report-failed tunnelId=${tunnelId} proxyPort=${proxyPort} status=${status} base=${base} status=${response.status} error=${payload.error || response.statusText}`);
+      return;
+    }
+
+    writeLog(`proxy-report ${status} tunnelId=${tunnelId} proxyPort=${proxyPort} proxyHost=${proxyHost} base=${base}`);
+  } catch (error) {
+    console.error('BridgeFlux proxy report error:', error.message || error);
+    writeLog(`proxy-report-error tunnelId=${tunnelId} proxyPort=${proxyPort} status=${status} base=${base} error=${error.message || error}`);
+  }
+}
+
+async function startTcpProxy({ port, token, tunnelId, base }) {
+  const net = require('net');
+
+  let totalBytesReceived = 0;
+  let totalBytesSent = 0;
+  let lastReportTime = Date.now();
+  let lastBytesReceived = 0;
+  let lastBytesSent = 0;
+
+  const openConnections = new Set();
+  const openTargets = new Set();
+
+  const proxyServer = net.createServer((socket) => {
+    const targetSocket = net.createConnection(
+      { port: parseInt(port), host: 'localhost' },
+      () => {
+        socket.pipe(targetSocket);
+        targetSocket.pipe(socket);
+
+        openConnections.add(socket);
+        openTargets.add(targetSocket);
+
+        const cleanupSocket = () => {
+          openConnections.delete(socket);
+        };
+        const cleanupTarget = () => {
+          openTargets.delete(targetSocket);
+        };
+
+        socket.on('close', cleanupSocket);
+        socket.on('end', cleanupSocket);
+        targetSocket.on('close', cleanupTarget);
+        targetSocket.on('end', cleanupTarget);
+
+        // Track incoming data from the tunnel
+        socket.on('data', (chunk) => {
+          totalBytesReceived += chunk.length;
+        });
+
+        // Track outgoing data to the tunnel
+        targetSocket.on('data', (chunk) => {
+          totalBytesSent += chunk.length;
+        });
+
+        socket.on('error', (err) => {
+          console.error(`[${new Date().toISOString()}] Socket error:`, err.message);
+          targetSocket.destroy();
+        });
+
+        targetSocket.on('error', (err) => {
+          console.error(`[${new Date().toISOString()}] Target socket error:`, err.message);
+          socket.destroy();
+        });
+      }
+    );
+
+    targetSocket.on('error', (err) => {
+      console.error(`[${new Date().toISOString()}] Connection to localhost:${port} failed:`, err.message);
+      socket.destroy();
+    });
+  });
+
+  // Use a dynamic port or the specified proxyPort
+  const proxyPort = getArg('--proxy-port') || 0;
+  let boundPort = 0;
+
+  proxyServer.listen(proxyPort, '127.0.0.1', async () => {
+    boundPort = proxyServer.address().port;
+    console.log(`\n🔌 BridgeFlux tunnel is active and proxying traffic to localhost:${port}`);
+    console.log(`   Proxy listening on 127.0.0.1:${boundPort}`);
+    console.log(`   Token: ${token}`);
+    console.log(`   Tunnel ID: ${tunnelId || 'auto'}`);
+    console.log(`   Backend: ${base}`);
+    console.log(`   Press Ctrl+C to disconnect\n`);
+    writeLog(`proxy-started port=${port} proxyPort=${boundPort} token=${token} tunnelId=${tunnelId}`);
+
+    if (tunnelId && base) {
+      await reportProxyState({
+        base,
+        tunnelId,
+        token,
+        proxyPort: boundPort,
+        proxyHost: '127.0.0.1',
+        status: 'connected',
+      });
+    }
+  });
+
+  // Report throughput metrics every 5 seconds
+  const reportInterval = setInterval(async () => {
+    const now = Date.now();
+    const timeDeltaMs = now - lastReportTime;
+    const bytesReceivedDelta = totalBytesReceived - lastBytesReceived;
+    const bytesSentDelta = totalBytesSent - lastBytesSent;
+    const totalBytesDelta = bytesReceivedDelta + bytesSentDelta;
+
+    if (totalBytesDelta > 0) {
+      const mbps = ((totalBytesDelta * 8) / (timeDeltaMs / 1000)) / 1_000_000;
+      const totalMb = (totalBytesReceived + totalBytesSent) / (1024 * 1024);
+      process.stdout.write(`\r📊 Throughput: ${mbps.toFixed(2)} Mbps | Total: ${totalMb.toFixed(2)} MB`);
+    }
+
+    // Send throughput update to backend
+    if (tunnelId && base && totalBytesDelta > 0) {
+      try {
+        const url = new URL('/api/agent/throughput', base).toString();
+        const mbps = ((totalBytesDelta * 8) / (timeDeltaMs / 1000)) / 1_000_000;
+        writeLog(`throughput-send tunnelId=${tunnelId} bytes=${totalBytesDelta} mbps=${mbps.toFixed(2)}`);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token,
+            tunnelId,
+            bytesTransferred: totalBytesDelta,
+            mbps,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.text().catch(() => 'unknown');
+          writeLog(`throughput-send-failed status=${response.status} error=${errorBody}`);
+        } else {
+          const result = await response.json().catch(() => ({}));
+          writeLog(`throughput-send-ok status=${response.status} totalBytes=${result.totalBytesTransferred}`);
+        }
+      } catch (error) {
+        writeLog(`throughput-send-error ${error instanceof Error ? error.message : error}`);
+      }
+    }
+
+    lastReportTime = now;
+    lastBytesReceived = totalBytesReceived;
+    lastBytesSent = totalBytesSent;
+  }, 5000);
+
+  // Graceful shutdown
+  process.on('SIGINT', async () => {
+    clearInterval(reportInterval);
+    const totalMb = (totalBytesReceived + totalBytesSent) / (1024 * 1024);
+    console.log(`\n\n🔌 Closing BridgeFlux tunnel...`);
+
+    if (openConnections.size > 0) {
+      for (const conn of openConnections) {
+        conn.destroy();
+      }
+    }
+    if (openTargets.size > 0) {
+      for (const target of openTargets) {
+        target.destroy();
+      }
+    }
+
+    if (tunnelId && base && boundPort) {
+      await reportProxyState({
+        base,
+        tunnelId,
+        token,
+        proxyPort: boundPort,
+        proxyHost: '127.0.0.1',
+        status: 'disconnected',
+      });
+    }
+
+    console.log(`   Total data transferred: ${totalMb.toFixed(2)} MB`);
+
+    const forceExit = setTimeout(() => {
+      console.log('⚠️ Force closing BridgeFlux tunnel after timeout.');
+      writeLog(`proxy-force-stop token=${token} tunnelId=${tunnelId} totalMb=${totalMb.toFixed(2)}`);
+      process.exit(0);
+    }, 3000);
+
+    proxyServer.close(() => {
+      clearTimeout(forceExit);
+      console.log('✅ Tunnel disconnected');
+      writeLog(`proxy-stopped token=${token} tunnelId=${tunnelId} totalMb=${totalMb.toFixed(2)}`);
+      process.exit(0);
+    });
+  });
 }
 
 async function main() {
@@ -79,7 +319,9 @@ async function main() {
         writeLog(`connect-failed port=${port} token=${token} tunnelId=${tunnelId} base=${base}`);
         process.exit(1);
       }
-      process.exit(0);
+      // Start the TCP proxy to forward traffic from the tunnel to the local service
+      await startTcpProxy({ port, token, tunnelId, base });
+      return;
     }
 
     console.log(`✅ BridgeFlux CLI stub: connected to localhost:${port} using token ${token}`);

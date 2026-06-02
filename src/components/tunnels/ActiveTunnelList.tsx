@@ -161,6 +161,16 @@ export function ActiveTunnelList() {
     }, 1500);
   };
 
+  const formatPublicEndpoint = (tunnel: any) => {
+    if (!tunnel?.publicUrl) return 'Pending public endpoint assignment';
+    const port = tunnel.publicPort ?? (tunnel.type === 'HTTP' ? 443 : undefined);
+    if (tunnel.type === 'TCP') return port ? `${tunnel.publicUrl}:${port}` : tunnel.publicUrl;
+    return `https://${tunnel.publicUrl}${port && port !== 443 ? `:${port}` : ''}`;
+  };
+
+  const setupEndpoint = initTunnel ? formatPublicEndpoint(initTunnel) : '';
+  const setupPort = initTunnel ? initTunnel.publicPort ?? (initTunnel.type === 'HTTP' ? 443 : 'Pending') : 443;
+
   const copyCommand = (text: string, id: string) => {
     // Prevent copying if another copy is in progress
     if (isCopying) {
@@ -206,13 +216,14 @@ export function ActiveTunnelList() {
 
   const getCommands = (tunnel: any, os: 'bash' | 'ps') => {
     const base = window.location.origin || "http://localhost:9002";
+    const defaultProxyPort = 63756;
     const install = os === 'bash' 
       ? `curl -sL ${base}/install.sh | sudo bash -s -- ${base}` 
       : `powershell.exe -Command "Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-Command','iwr -useb ${base}/install.ps1 | iex' -Verb RunAs"`;
     
     const connect = os === 'bash'
-      ? `bridgeflux connect --port ${tunnel.localPort} --token ${token} --tunnel-id ${tunnel.id} --base ${window.location.origin}`
-      : `powershell.exe -Command "Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-Command','bridgeflux connect --port ${tunnel.localPort} --token ${token} --tunnel-id ${tunnel.id} --base ${window.location.origin}' -Verb RunAs"`;
+      ? `bridgeflux connect --port ${tunnel.localPort} --token ${token} --tunnel-id ${tunnel.id} --proxy-port ${defaultProxyPort} --base ${window.location.origin}`
+      : `powershell.exe -Command "Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-Command','bridgeflux connect --port ${tunnel.localPort} --token ${token} --tunnel-id ${tunnel.id} --proxy-port ${defaultProxyPort} --base ${window.location.origin}' -Verb RunAs"`;
     
     return { install, connect };
   };
@@ -285,8 +296,11 @@ export function ActiveTunnelList() {
             <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-bold animate-pulse">Syncing Mission Data...</p>
           </div>
         ) : tunnels && tunnels.length > 0 ? (
-          tunnels.map((tunnel: any) => (
-            <div key={tunnel.id} className="glass-panel rounded-[2rem] p-8 flex flex-col lg:flex-row items-center justify-between hover:border-primary/40 transition-all group border border-white/5 relative shadow-2xl overflow-hidden">
+          tunnels.map((tunnel: any) => {
+            const publicEndpoint = formatPublicEndpoint(tunnel);
+            const publicPort = tunnel.publicPort ?? (tunnel.type === 'HTTP' ? 443 : 'Pending');
+            return (
+              <div key={tunnel.id} className="glass-panel rounded-[2rem] p-8 flex flex-col lg:flex-row items-center justify-between hover:border-primary/40 transition-all group border border-white/5 relative shadow-2xl overflow-hidden">
               <div className="flex items-center space-x-8 w-full lg:w-auto">
                 <div className={cn(
                   "w-24 h-24 rounded-[2.2rem] flex items-center justify-center transition-all group-hover:scale-110 duration-500 shadow-2xl relative",
@@ -312,11 +326,21 @@ export function ActiveTunnelList() {
                     </Badge>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center text-sm text-muted-foreground gap-4 sm:gap-10">
-                    <div className="flex items-center space-x-3 bg-secondary/30 px-4 py-2 rounded-xl border border-white/5">
-                      <Cloud className="w-4 h-4 text-primary/70" />
-                      <span className="font-mono text-primary font-bold tracking-tight text-xs">
-                        {tunnel.publicUrl}{tunnel.type === 'TCP' && `:${tunnel.publicPort}`}
-                      </span>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                      <div className="flex items-center space-x-3 bg-secondary/30 px-4 py-2 rounded-xl border border-white/5">
+                        <Cloud className="w-4 h-4 text-primary/70" />
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground font-bold">Public Endpoint</p>
+                          <span className="font-mono text-primary font-bold text-xs">{publicEndpoint}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 bg-secondary/20 px-4 py-2 rounded-xl border border-white/5">
+                        <Server className="w-4 h-4 text-muted-foreground/30" />
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground font-bold">Public Port</p>
+                          <span className="font-mono text-muted-foreground/60 text-xs">{publicPort === 'Pending' ? 'Pending' : publicPort}</span>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex items-center space-x-3">
                       <TerminalIcon className="w-4 h-4 text-muted-foreground/30" />
@@ -324,6 +348,14 @@ export function ActiveTunnelList() {
                         localhost:{tunnel.localPort}
                       </span>
                     </div>
+                    {tunnel.proxyHost && tunnel.proxyPort && (
+                      <div className="flex items-center space-x-3">
+                        <Server className="w-4 h-4 text-muted-foreground/30" />
+                        <span className="font-mono text-muted-foreground/60 text-xs">
+                          Proxy {tunnel.proxyHost}:{tunnel.proxyPort}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   {tunnel.latency === '---' && (
                     <p className="text-xs text-muted-foreground/70 mt-2 max-w-2xl">
@@ -454,6 +486,25 @@ export function ActiveTunnelList() {
                             })}
                           </Tabs>
                         </div>
+                        <div className="rounded-2xl border border-white/10 bg-secondary/10 p-4 text-[11px] text-muted-foreground space-y-3">
+                          <div>
+                            <p className="font-bold text-foreground">Live Public Edge Endpoint</p>
+                            <p className="text-xs text-muted-foreground/80">This is the public URL and port that the BridgeFlux mesh assigns once the tunnel is active.</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-2xl bg-background/50 p-3 border border-white/10">
+                              <p className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-bold">Public URL</p>
+                              <p className="font-mono text-primary text-xs break-all">{setupEndpoint || 'Connect a tunnel to display it'}</p>
+                            </div>
+                            <div className="rounded-2xl bg-background/50 p-3 border border-white/10">
+                              <p className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-bold">Public Port</p>
+                              <p className="font-mono text-primary text-xs">{setupPort}</p>
+                            </div>
+                          </div>
+                          <p className="text-[10px] leading-relaxed text-muted-foreground/80">
+                            Run the command above on the machine hosting your local service. Once the CLI activates the tunnel, the public host will route traffic into your live app through the assigned edge port.
+                          </p>
+                        </div>
                         <div className="p-6 rounded-2xl bg-secondary/20 border border-white/5 flex items-start space-x-4">
                           <Info className="w-5 h-5 text-primary mt-0.5 shrink-0" />
                           <p className="text-xs text-muted-foreground leading-relaxed font-medium">
@@ -467,7 +518,7 @@ export function ActiveTunnelList() {
                       variant="outline" 
                       size="lg" 
                       disabled={isVerifying === tunnel.id}
-                      onClick={() => verifyConnectivity(tunnel.id, tunnel.publicUrl)}
+                      onClick={() => verifyConnectivity(tunnel.id, publicEndpoint)}
                       className="text-[11px] font-bold uppercase tracking-widest h-14 border-primary/20 hover:bg-primary/10 text-primary px-8 rounded-2xl shadow-xl transition-all"
                     >
                       {isVerifying === tunnel.id ? <Loader2 className="w-5 h-5 animate-spin mr-3" /> : <RefreshCcw className="w-5 h-5 mr-3" />}
@@ -492,7 +543,8 @@ export function ActiveTunnelList() {
                 </div>
               )}
             </div>
-          ))
+          );
+        })
         ) : (
           <div className="glass-panel border-dashed border-2 rounded-[3rem] py-40 flex flex-col items-center justify-center text-center px-12 bg-secondary/5 border-white/5">
             <div className="w-28 h-28 rounded-full bg-secondary/10 flex items-center justify-center mb-10 border border-white/5">
