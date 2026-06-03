@@ -1,5 +1,5 @@
 param(
-  [string]$base = "http://localhost:9002"
+  [string]$base = "https://bridge-flux.vercel.app"
 )
 
 if (-not $base) {

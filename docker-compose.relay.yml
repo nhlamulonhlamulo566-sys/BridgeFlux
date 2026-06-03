@@ -1,0 +1,12 @@
+services:
+  bridgeflux-relay:
+    build:
+      context: ./gateway
+    container_name: bridgeflux-relay
+    ports:
+      - "5000:5000"
+      - "16567:16567"
+    environment:
+      RELAY_BIND_HOST: 0.0.0.0
+      RELAY_CONTROL_PORT: 5000
+    restart: unless-stopped

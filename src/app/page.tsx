@@ -67,7 +67,11 @@ export default function Home() {
   const totalReservedCount = domains?.length || 0;
 
   const throughputMB = useMemo(() => {
-    if (!traffic || traffic.length === 0) return '0.00';
+    if (!traffic || traffic.length === 0) {
+      const tunnelThroughput = tunnels?.reduce((acc: number, t: any) => acc + (Number(t.lastThroughputMbps) || 0), 0) || 0;
+      return tunnelThroughput.toFixed(2);
+    }
+
     const totalBytes = traffic.reduce((acc: number, log: any) => acc + (log.size || 0), 0);
     const timestamps = traffic
       .map((log: any) => log.timestamp?.toDate?.())
@@ -80,7 +84,7 @@ export default function Home() {
     const sortedTimestamps = timestamps.sort((a: Date, b: Date) => a.getTime() - b.getTime());
     const durationHours = Math.max((sortedTimestamps[sortedTimestamps.length - 1].getTime() - sortedTimestamps[0].getTime()) / 3600000, 1 / 60);
     return (totalBytes / (1024 * 1024) / durationHours).toFixed(2);
-  }, [traffic]);
+  }, [traffic, tunnels]);
 
   const wafLatency = useMemo(() => {
     const trafficLatencies = traffic

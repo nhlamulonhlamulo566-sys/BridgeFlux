@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 
 const args = process.argv.slice(2);
 const home = os.homedir();
@@ -16,13 +17,161 @@ function writeLog(message) {
   fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${message}\n`);
 }
 
+function generateId() {
+  return crypto.randomBytes(8).toString('hex');
+}
+
+function serializeControlMessage(payload) {
+  return `${JSON.stringify(payload)}\n`;
+}
+
+function sendControlMessage(socket, payload) {
+  if (!socket || socket.destroyed) return;
+  socket.write(serializeControlMessage(payload));
+}
+
+async function startRelayTunnel({ relayHost, relayPort, localPort, token, tunnelId, publicPort }) {
+  const net = require('net');
+  const controlSocket = net.createConnection({ host: relayHost, port: relayPort }, () => {
+    console.log(`🔌 Connected to relay ${relayHost}:${relayPort}`);
+    sendControlMessage(controlSocket, {
+      type: 'register',
+      token,
+      tunnelId,
+      localPort: parseInt(localPort, 10),
+      publicPort: publicPort ? parseInt(publicPort, 10) : undefined,
+    });
+  });
+
+  let buffer = '';
+  const connectionMap = new Map();
+
+  const cleanupConnection = (connId) => {
+    const localSocket = connectionMap.get(connId);
+    if (localSocket) {
+      connectionMap.delete(connId);
+      localSocket.destroy();
+    }
+  };
+
+  const closeAllConnections = () => {
+    for (const localSocket of connectionMap.values()) {
+      localSocket.destroy();
+    }
+    connectionMap.clear();
+  };
+
+  controlSocket.on('data', (chunk) => {
+    buffer += chunk.toString();
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+      const raw = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (!raw) continue;
+
+      let msg;
+      try {
+        msg = JSON.parse(raw);
+      } catch (error) {
+        console.error('BridgeFlux relay: invalid control frame', error.message);
+        continue;
+      }
+
+      switch (msg.type) {
+        case 'registered': {
+          if (msg.status === 'ok') {
+            const assignedPort = msg.publicPort || publicPort;
+            console.log(`✅ Relay active. Public endpoint: ${relayHost}:${assignedPort}`);
+            return;
+          }
+
+          console.error('BridgeFlux relay registration failed:', msg.error || 'unknown error');
+          controlSocket.destroy();
+          return;
+        }
+        case 'new_connection': {
+          const connId = msg.connId;
+          const localSocket = net.createConnection({ port: parseInt(localPort, 10), host: '127.0.0.1' }, () => {
+            sendControlMessage(controlSocket, { type: 'ready', connId });
+          });
+
+          connectionMap.set(connId, localSocket);
+
+          localSocket.on('data', (data) => {
+            sendControlMessage(controlSocket, {
+              type: 'data',
+              connId,
+              payload: data.toString('base64'),
+            });
+          });
+
+          localSocket.on('close', () => {
+            sendControlMessage(controlSocket, { type: 'close', connId });
+            cleanupConnection(connId);
+          });
+
+          localSocket.on('error', (err) => {
+            console.error(`BridgeFlux relay local socket error for ${connId}:`, err.message);
+            sendControlMessage(controlSocket, { type: 'error', connId, message: err.message });
+            cleanupConnection(connId);
+          });
+          return;
+        }
+        case 'data': {
+          const { connId, payload } = msg;
+          const localSocket = connectionMap.get(connId);
+          if (localSocket && !localSocket.destroyed) {
+            localSocket.write(Buffer.from(payload, 'base64'));
+          }
+          return;
+        }
+        case 'close': {
+          cleanupConnection(msg.connId);
+          return;
+        }
+        case 'error': {
+          console.error('BridgeFlux relay error from server:', msg.message || msg.error);
+          return;
+        }
+        default:
+          console.warn('BridgeFlux relay: unknown message type', msg.type);
+          return;
+      }
+    }
+  });
+
+  controlSocket.on('error', (err) => {
+    console.error('BridgeFlux relay control connection error:', err.message);
+  });
+
+  controlSocket.on('close', () => {
+    console.log('BridgeFlux relay control connection closed.');
+    closeAllConnections();
+  });
+
+  process.on('SIGINT', () => {
+    console.log('\n🔌 Closing BridgeFlux relay tunnel...');
+    closeAllConnections();
+    controlSocket.destroy();
+    process.exit(0);
+  });
+
+  await new Promise((resolve) => {
+    controlSocket.on('end', () => resolve());
+    controlSocket.on('close', () => resolve());
+    controlSocket.on('error', () => resolve());
+  });
+
+  return false;
+}
+
 function help() {
   console.log('╔═══════════════════════════════════════════════════════════╗');
   console.log('║          BridgeFlux CLI - Persistent Tunnel Proxy         ║');
   console.log('╚═══════════════════════════════════════════════════════════╝');
   console.log('');
   console.log('USAGE:');
-  console.log('  bridgeflux connect --port <PORT> --token <TOKEN> --base <URL> [--tunnel-id <ID>] [--proxy-port <PORT>]');
+  console.log('  bridgeflux connect --port <PORT> --token <TOKEN> --base <URL> [--tunnel-id <ID>] [--proxy-port <PORT>] [--relay-host <HOST> --relay-port <PORT>] [--public-port <PORT>]');
   console.log('  bridgeflux service install --port <PORT> --token <TOKEN> --startup automatic');
   console.log('  bridgeflux disconnect');
   console.log('  bridgeflux logs');
@@ -31,6 +180,8 @@ function help() {
   console.log('  # Activate a live tunnel and start proxying traffic');
   console.log('  bridgeflux connect --port 3306 --token bf_user_123 \\');
   console.log('    --tunnel-id abc123 --proxy-port 63756 --base https://bridge-flux.vercel.app');
+  console.log('  bridgeflux connect --port 3306 --token bf_user_123 \\');
+  console.log('    --tunnel-id abc123 --relay-host tcp.flux.io --relay-port 5000 --public-port 16567 --base https://bridge-flux.vercel.app');
   console.log('');
   console.log('  # Install as Windows service (auto-start on boot)');
   console.log('  bridgeflux service install --port 3306 --token bf_user_123 \\');
@@ -82,7 +233,7 @@ async function notifyAgentConnect({ base, tunnelId, token, port, latency }) {
     }
 
     writeLog(`connect port=${port} token=${token} tunnelId=${tunnelId} base=${base} latency=${payload.latency || latency} status=${response.status}`);
-    return true;
+    return payload;
   } catch (error) {
     console.error('BridgeFlux agent notification error:', error.message || error);
     writeLog(`connect-error port=${port} token=${token} tunnelId=${tunnelId} base=${base} error=${error.message || error}`);
@@ -311,14 +462,23 @@ async function main() {
     const token = getArg('--token') || 'unknown';
     const tunnelId = getArg('--tunnel-id');
     const base = getArg('--base');
+    const relayHost = getArg('--relay-host') || process.env.BRIDGEFLUX_RELAY_HOST;
+    const relayPort = parseInt(getArg('--relay-port') || process.env.BRIDGEFLUX_RELAY_PORT || '', 10);
+    const publicPort = getArg('--public-port') || process.env.BRIDGEFLUX_PUBLIC_PORT;
     const latency = `${Math.floor(Math.random() * 40) + 10}ms`;
 
     if (base) {
-      const success = await notifyAgentConnect({ base, tunnelId, token, port, latency });
-      if (!success) {
+      const payload = await notifyAgentConnect({ base, tunnelId, token, port, latency });
+      if (!payload) {
         writeLog(`connect-failed port=${port} token=${token} tunnelId=${tunnelId} base=${base}`);
         process.exit(1);
       }
+
+      if (relayHost && relayPort) {
+        await startRelayTunnel({ relayHost, relayPort, localPort: port, token, tunnelId, publicPort: publicPort || payload.publicPort });
+        return;
+      }
+
       // Start the TCP proxy to forward traffic from the tunnel to the local service
       await startTcpProxy({ port, token, tunnelId, base });
       return;

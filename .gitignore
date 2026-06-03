@@ -50,3 +50,6 @@ studio-7583316153-57312-firebase-adminsdk-fbsvc-e6ce47ddd3.json
 *.firebase-adminsdk*.json
 *.google-service-account*.json
 .vercel
+firebasekey-escaped.b64
+firebasekey-singleline.json
+firebasekey.b64
